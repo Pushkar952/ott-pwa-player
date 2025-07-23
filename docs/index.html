@@ -309,6 +309,96 @@
       opacity: 0;
       pointer-events: none;
     }
+    /* Hide Plyr controls on mobile, show custom OTT controls */
+    @media (max-width: 600px) {
+      .plyr__controls {
+        display: none !important;
+      }
+      #custom-ott-controls {
+        display: flex;
+      }
+    }
+    @media (min-width: 601px) {
+      #custom-ott-controls {
+        display: none;
+      }
+    }
+    #custom-ott-controls {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      width: 100vw;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      z-index: 1005;
+      pointer-events: none;
+      padding-bottom: 12px;
+    }
+    .ott-center-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 16px;
+      pointer-events: auto;
+    }
+    .ott-center-controls button {
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 56px;
+      height: 56px;
+      font-size: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      transition: background 0.2s;
+      margin: 0 2px;
+    }
+    .ott-center-controls button:active {
+      background: #222;
+    }
+    #ott-skip-intro {
+      border-radius: 24px;
+      background: #e50914;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 600;
+      padding: 0 18px;
+      width: auto;
+      height: 44px;
+      margin-left: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      letter-spacing: 0.5px;
+      border: none;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+    #ott-skip-intro:active {
+      background: #b00610;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .ott-bottom-controls {
+      display: flex;
+      align-items: center;
+      width: 90vw;
+      max-width: 600px;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    #ott-seek {
+      flex: 1;
+      accent-color: #e50914;
+      height: 4px;
+    }
+    #ott-current, #ott-duration {
+      color: #fff;
+      font-size: 1rem;
+      min-width: 48px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -323,6 +413,24 @@
 
   <div id="container">
     <video id="player" playsinline controls></video>
+    <!-- Custom Controls Overlay (mobile-first) -->
+    <div id="custom-ott-controls">
+      <div class="ott-center-controls">
+        <button id="ott-rewind" aria-label="Rewind 10s">⏪</button>
+        <button id="ott-playpause" aria-label="Play/Pause">▶️</button>
+        <button id="ott-forward" aria-label="Forward 10s">⏩</button>
+        <button id="ott-mute" aria-label="Mute/Unmute">🔊</button>
+        <button id="ott-fullscreen" aria-label="Fullscreen">⛶</button>
+        <button id="ott-prev" aria-label="Previous" style="display:none">⏮️</button>
+        <button id="ott-next" aria-label="Next" style="display:none">⏭️</button>
+        <button id="ott-skip-intro" aria-label="Skip Intro" style="display:none">Skip Intro</button>
+      </div>
+      <div class="ott-bottom-controls">
+        <span id="ott-current">00:00</span>
+        <input type="range" id="ott-seek" min="0" max="100" value="0" step="0.1">
+        <span id="ott-duration">00:00</span>
+      </div>
+    </div>
     <div id="center-play">
       <svg id="center-play-icon" viewBox="0 0 64 64">
         <polygon points="16,12 56,32 16,52" />
@@ -548,6 +656,107 @@
     const params = new URLSearchParams(window.location.search);
     const defaultMode = params.get("portrait") === "true" ? "portrait" : 'landscape';
     playVideo(defaultMode);
+
+    // Custom OTT Controls logic
+    const ottControls = document.getElementById('custom-ott-controls');
+    const ottPlayPause = document.getElementById('ott-playpause');
+    const ottRewind = document.getElementById('ott-rewind');
+    const ottForward = document.getElementById('ott-forward');
+    const ottSeek = document.getElementById('ott-seek');
+    const ottCurrent = document.getElementById('ott-current');
+    const ottDuration = document.getElementById('ott-duration');
+    const ottMute = document.getElementById('ott-mute');
+    const ottFullscreen = document.getElementById('ott-fullscreen');
+    const ottPrev = document.getElementById('ott-prev');
+    const ottNext = document.getElementById('ott-next');
+    const ottSkipIntro = document.getElementById('ott-skip-intro');
+
+    function formatTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
+
+    function updateOttControls() {
+      ottCurrent.textContent = formatTime(player.currentTime);
+      ottDuration.textContent = formatTime(player.duration);
+      ottSeek.value = player.currentTime;
+      ottSeek.max = player.duration;
+      ottPlayPause.textContent = player.paused ? '▶️' : '⏸️';
+      ottMute.textContent = player.muted || player.volume === 0 ? '🔇' : '🔊';
+      ottFullscreen.textContent = player.fullscreen.active ? '🡼' : '⛶';
+      // Show/hide skip intro
+      if (
+        player.currentTime > skipIntroRange.start &&
+        player.currentTime < skipIntroRange.end
+      ) {
+        ottSkipIntro.style.display = 'inline-block';
+      } else {
+        ottSkipIntro.style.display = 'none';
+      }
+      // Show/hide next/prev if playlist
+      ottPrev.style.display = playlist.length > 1 ? 'inline-block' : 'none';
+      ottNext.style.display = playlist.length > 1 ? 'inline-block' : 'none';
+    }
+
+    player.on('timeupdate', updateOttControls);
+    player.on('play', updateOttControls);
+    player.on('pause', updateOttControls);
+    player.on('loadedmetadata', updateOttControls);
+
+    ottPlayPause.addEventListener('click', () => {
+      if (player.paused) player.play();
+      else player.pause();
+    });
+    ottRewind.addEventListener('click', () => {
+      player.currentTime = Math.max(0, player.currentTime - 10);
+    });
+    ottForward.addEventListener('click', () => {
+      player.currentTime = Math.min(player.duration, player.currentTime + 10);
+    });
+    ottSeek.addEventListener('input', (e) => {
+      player.currentTime = parseFloat(e.target.value);
+    });
+    ottMute.addEventListener('click', () => {
+      player.muted = !player.muted;
+      updateOttControls();
+    });
+    ottFullscreen.addEventListener('click', () => {
+      player.fullscreen.toggle();
+      updateOttControls();
+    });
+    ottPrev.addEventListener('click', () => {
+      const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+      playVideo(playlist[prevIndex]);
+    });
+    ottNext.addEventListener('click', () => {
+      const nextIndex = (currentIndex + 1) % playlist.length;
+      playVideo(playlist[nextIndex]);
+    });
+    ottSkipIntro.addEventListener('click', () => {
+      player.currentTime = skipIntroRange.end;
+      updateOttControls();
+    });
+
+    // Show/hide custom controls on tap
+    let ottControlsTimeout;
+    function showOttControls() {
+      ottControls.style.opacity = 1;
+      ottControls.style.pointerEvents = 'auto';
+      clearTimeout(ottControlsTimeout);
+      ottControlsTimeout = setTimeout(() => {
+        ottControls.style.opacity = 0;
+        ottControls.style.pointerEvents = 'none';
+      }, 2500);
+    }
+    ottControls.style.opacity = 1;
+    ottControls.style.pointerEvents = 'auto';
+    document.body.addEventListener('touchstart', showOttControls);
+    document.body.addEventListener('mousemove', showOttControls);
+    // Always show on pause
+    player.on('pause', showOttControls);
+    // Hide on play after timeout
+    player.on('play', showOttControls);
   </script>
   <script>
     if ('serviceWorker' in navigator) {
