@@ -1,3 +1,416 @@
 <!DOCTYPE html>
-<!-- The full updated HTML code you provided goes here -->
-<!-- Due to space, assume it's stored in a variable or already exists -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>OTT Player (Portrait + Landscape)</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    video {
+      object-fit: contain !important;
+      background: black;
+    }
+
+    .portrait .plyr__video-wrapper {
+      width: auto !important;
+      height: 100vh !important;
+      aspect-ratio: 9 / 16;
+    }
+
+    .landscape .plyr__video-wrapper {
+      width: 100vw !important;
+      height: 100vh !important;
+      aspect-ratio: 16 / 9;
+    }
+
+    .controls {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 1000;
+      display: flex;
+      gap: 12px;
+      transition: opacity 0.3s;
+      opacity: 1;
+    }
+    .controls.hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .controls button {
+      padding: 10px 15px;
+      font-size: 14px;
+      cursor: pointer;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      transition: background 0.2s;
+    }
+
+    .controls button:hover {
+      background-color: #0056b3;
+    }
+
+    /* Central Play/Pause Overlay */
+    #center-play {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1002;
+      background: rgba(0,0,0,0.5);
+      border-radius: 50%;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    #center-play.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    #center-play svg {
+      width: 40px;
+      height: 40px;
+      fill: white;
+    }
+
+    /* Buffering Spinner */
+    #buffering {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      z-index: 1003;
+    }
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #007BFF;
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Skip Intro Button */
+    #skip-intro {
+      position: absolute;
+      bottom: 40px;
+      right: 32px;
+      z-index: 1001;
+      display: none;
+      padding: 12px 28px;
+      font-size: 16px;
+      background: #e50914;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      cursor: pointer;
+      transition: background 0.2s, box-shadow 0.2s;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    #skip-intro:hover {
+      background: #b00610;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+
+    /* Continue Watching Overlay */
+    #continue-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 1004;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 22px;
+    }
+    #continue-overlay button {
+      margin-top: 20px;
+      padding: 12px 28px;
+      font-size: 18px;
+      background: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    #continue-overlay button:hover {
+      background: #0056b3;
+    }
+    .plyr__controls {
+      position: absolute !important;
+      bottom: 0 !important;
+      width: 100% !important;
+      left: 0 !important;
+      z-index: 1001;
+    }
+    #container {
+      position: relative;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="controls" id="custom-controls">
+    <button onclick="playVideo('landscape')">Play Landscape</button>
+    <button onclick="playVideo('portrait')">Play Portrait</button>
+  </div>
+
+  <div id="container">
+    <video id="player" playsinline controls></video>
+    <div id="center-play">
+      <svg id="center-play-icon" viewBox="0 0 64 64">
+        <polygon points="16,12 56,32 16,52" />
+      </svg>
+    </div>
+    <div id="buffering"><div class="spinner"></div></div>
+    <button id="skip-intro">Skip Intro</button>
+    <div id="continue-overlay">
+      <div>Continue watching?</div>
+      <button id="continue-btn">Resume</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+  <script>
+    const playerElement = document.getElementById('player');
+    const container = document.getElementById('container');
+    const controls = document.getElementById('custom-controls');
+    const centerPlay = document.getElementById('center-play');
+    const centerPlayIcon = document.getElementById('center-play-icon');
+    const buffering = document.getElementById('buffering');
+    const skipIntroBtn = document.getElementById('skip-intro');
+    const continueOverlay = document.getElementById('continue-overlay');
+    const continueBtn = document.getElementById('continue-btn');
+
+    const player = new Plyr(playerElement, {
+      controls: [
+        'restart',
+        'rewind',
+        'play',
+        'fast-forward',
+        'progress',
+        'current-time',
+        'duration',
+        'mute',
+        'volume',
+        'captions',
+        'download',
+        'pip',
+        'airplay',
+        'settings',
+        'fullscreen'
+      ],
+      settings: ['captions', 'speed', 'quality'],
+      speed: { selected: 1, options: [0.5, 1, 1.25, 1.5, 2] }
+    });
+
+    const videos = {
+      landscape: 'https://res.cloudinary.com/dkkrrp5mg/video/upload/v1753256927/1437396-hd_1280_720_24fps_wauruf.mp4',
+      portrait: 'https://res.cloudinary.com/dkkrrp5mg/video/upload/v1753256906/14106168_1080_1920_60fps_z7kf2e.mp4'
+    };
+
+    const playlist = ['landscape', 'portrait'];
+    let currentIndex = 0;
+    let autoHideTimeout;
+    let lastMode = null;
+    let lastPosition = 0;
+    let skipIntroRange = { start: 5, end: 30 }; // Example: 0-30s is intro
+
+    function showControls() {
+      controls.classList.remove('hide');
+      clearTimeout(autoHideTimeout);
+      autoHideTimeout = setTimeout(() => {
+        controls.classList.add('hide');
+      }, 2500);
+    }
+    function showCenterPlay(show, isPlay = true) {
+      if (show) {
+        centerPlay.classList.add('visible');
+        centerPlayIcon.innerHTML = isPlay
+          ? '<polygon points="16,12 56,32 16,52" />'
+          : '<rect x="18" y="16" width="10" height="32" rx="3"/><rect x="36" y="16" width="10" height="32" rx="3"/>';
+      } else {
+        centerPlay.classList.remove('visible');
+      }
+    }
+
+    function playVideo(mode, resume = false) {
+      currentIndex = playlist.indexOf(mode);
+      const src = videos[mode];
+      const key = 'ott:last_position:' + mode;
+      lastMode = mode;
+      container.className = mode;
+      player.source = {
+        type: 'video',
+        sources: [{ src, type: 'video/mp4' }],
+      };
+      player.once('ready', () => {
+        let saved = localStorage.getItem(key);
+        if (resume && saved) {
+          player.currentTime = parseFloat(saved);
+        } else if (saved && parseFloat(saved) > 10) {
+          // Show continue overlay if not at start
+          continueOverlay.style.display = 'flex';
+          lastPosition = parseFloat(saved);
+          player.pause();
+          return;
+        }
+        player.play().catch(err => console.warn("Autoplay failed:", err.message));
+      });
+      player.on('timeupdate', () => {
+        localStorage.setItem(key, player.currentTime);
+        // Skip Intro logic
+        if (
+          player.currentTime > skipIntroRange.start &&
+          player.currentTime < skipIntroRange.end
+        ) {
+          skipIntroBtn.style.display = 'block';
+        } else {
+          skipIntroBtn.style.display = 'none';
+        }
+      });
+      player.on('ended', () => {
+        const nextIndex = (currentIndex + 1) % playlist.length;
+        playVideo(playlist[nextIndex]);
+      });
+      player.on('play', () => {
+        showCenterPlay(false);
+      });
+      player.on('pause', () => {
+        showCenterPlay(true, true);
+      });
+      player.on('waiting', () => {
+        buffering.style.display = 'block';
+      });
+      player.on('playing', () => {
+        buffering.style.display = 'none';
+      });
+    }
+
+    // Auto-hide controls on mouse/tap
+    document.body.addEventListener('mousemove', showControls);
+    document.body.addEventListener('touchstart', showControls);
+    showControls();
+
+    // Central play/pause overlay click
+    centerPlay.addEventListener('click', () => {
+      if (player.paused) player.play();
+      else player.pause();
+    });
+
+    // Double-tap seek gesture (mobile)
+    let lastTap = 0;
+    playerElement.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        const x = e.changedTouches[0].clientX;
+        if (x < window.innerWidth / 2) {
+          player.currentTime = Math.max(0, player.currentTime - 10);
+        } else {
+          player.currentTime = Math.min(player.duration, player.currentTime + 10);
+        }
+        showCenterPlay(true, false);
+        setTimeout(() => showCenterPlay(false), 600);
+      }
+      lastTap = now;
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement.tagName === 'INPUT') return;
+      switch (e.key) {
+        case ' ':
+          player.togglePlay();
+          break;
+        case 'ArrowLeft':
+          player.currentTime = Math.max(0, player.currentTime - 10);
+          showCenterPlay(true, false);
+          setTimeout(() => showCenterPlay(false), 600);
+          break;
+        case 'ArrowRight':
+          player.currentTime = Math.min(player.duration, player.currentTime + 10);
+          showCenterPlay(true, false);
+          setTimeout(() => showCenterPlay(false), 600);
+          break;
+        case 'ArrowUp':
+          player.volume = Math.min(player.volume + 0.1, 1);
+          break;
+        case 'ArrowDown':
+          player.volume = Math.max(player.volume - 0.1, 0);
+          break;
+        case 'f':
+          player.fullscreen.toggle();
+          break;
+      }
+    });
+
+    // Skip Intro button
+    skipIntroBtn.onclick = () => {
+      player.currentTime = skipIntroRange.end;
+      skipIntroBtn.style.display = 'none';
+    };
+
+    // Continue Watching overlay
+    continueBtn.onclick = () => {
+      continueOverlay.style.display = 'none';
+      playVideo(lastMode, true);
+    };
+
+    // Hide overlays on play
+    player.on('play', () => {
+      continueOverlay.style.display = 'none';
+      buffering.style.display = 'none';
+    });
+
+    // Auto-play based on URL param
+    const params = new URLSearchParams(window.location.search);
+    const defaultMode = params.get("portrait") === "true" ? "portrait" : 'landscape';
+    playVideo(defaultMode);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./service-worker.js');
+      });
+    }
+  </script>
+</body>
+</html>
