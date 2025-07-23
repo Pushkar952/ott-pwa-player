@@ -180,14 +180,142 @@
       left: 0 !important;
       z-index: 1001;
     }
+    #video-bg {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      background: #111;
+      filter: blur(24px) brightness(0.7);
+      transition: background-image 0.3s;
+      background-size: cover;
+      background-position: center;
+      pointer-events: none;
+    }
     #container {
       position: relative;
       overflow: hidden;
+      z-index: 1;
+    }
+    .plyr__controls {
+      position: fixed !important;
+      left: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      min-height: 64px !important;
+      height: 64px !important;
+      font-size: 18px !important;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 80%, rgba(0,0,0,0.0));
+      box-shadow: 0 -2px 16px rgba(0,0,0,0.25);
+      z-index: 1001;
+      padding: 0 12px !important;
+      display: flex !important;
+      align-items: center;
+    }
+    .plyr__controls button,
+    .plyr__controls .plyr__control {
+      min-width: 48px !important;
+      min-height: 48px !important;
+      font-size: 20px !important;
+      margin: 0 4px !important;
+    }
+    @media (max-width: 600px) {
+      .controls {
+        top: 8px;
+        left: 8px;
+        gap: 8px;
+      }
+      .controls button {
+        padding: 10px 12px;
+        font-size: 15px;
+        border-radius: 10px;
+      }
+      .plyr__controls {
+        min-height: 56px !important;
+        height: 56px !important;
+        font-size: 16px !important;
+        padding: 0 4px !important;
+      }
+      .plyr__controls button,
+      .plyr__controls .plyr__control {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        font-size: 18px !important;
+        margin: 0 2px !important;
+      }
+      #skip-intro {
+        bottom: 16px;
+        right: 12px;
+        padding: 10px 18px;
+        font-size: 15px;
+        border-radius: 20px;
+      }
+      #center-play {
+        width: 60px;
+        height: 60px;
+      }
+      #center-play svg {
+        width: 32px;
+        height: 32px;
+      }
+      #continue-overlay {
+        font-size: 18px;
+        padding: 0 10px;
+      }
+      #continue-overlay button {
+        font-size: 16px;
+        padding: 10px 18px;
+      }
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border-width: 5px;
+      }
+      .portrait .plyr__video-wrapper {
+        width: 100vw !important;
+        height: 100vh !important;
+        aspect-ratio: 9 / 16;
+      }
+      .landscape .plyr__video-wrapper {
+        width: 100vw !important;
+        height: 100vh !important;
+        aspect-ratio: 16 / 9;
+      }
+    }
+    #splash-screen {
+      position: fixed;
+      z-index: 9999;
+      top: 0; left: 0; right: 0; bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #181414;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.7s;
+    }
+    .splash-logo {
+      color: #e5e5e5;
+      font-size: 2.8rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      font-family: 'Arial Black', Arial, sans-serif;
+      background: #181414;
+      padding: 0.5em 1.5em;
+      border-radius: 8px;
+    }
+    #splash-screen.hide {
+      opacity: 0;
+      pointer-events: none;
     }
   </style>
 </head>
 <body>
-
+  <div id="splash-screen">
+    <span class="splash-logo">ASIAPLEX+</span>
+  </div>
+  <div id="video-bg"></div>
   <div class="controls" id="custom-controls">
     <button onclick="playVideo('landscape')">Play Landscape</button>
     <button onclick="playVideo('portrait')">Play Portrait</button>
@@ -219,6 +347,7 @@
     const skipIntroBtn = document.getElementById('skip-intro');
     const continueOverlay = document.getElementById('continue-overlay');
     const continueBtn = document.getElementById('continue-btn');
+    const splashScreen = document.getElementById('splash-screen');
 
     const player = new Plyr(playerElement, {
       controls: [
@@ -272,11 +401,19 @@
       }
     }
 
+    // Set blurred background for portrait/landscape
+    function setVideoBg(src) {
+      const bg = document.getElementById('video-bg');
+      // Use a blurred thumbnail or the video itself as background
+      // For demo, use the video frame as background (may not work on all browsers)
+      bg.style.backgroundImage = `url('${src.replace('.mp4','.jpg')}' )`;
+    }
     function playVideo(mode, resume = false) {
       currentIndex = playlist.indexOf(mode);
       const src = videos[mode];
       const key = 'ott:last_position:' + mode;
       lastMode = mode;
+      setVideoBg(src);
       container.className = mode;
       player.source = {
         type: 'video',
@@ -399,6 +536,13 @@
       continueOverlay.style.display = 'none';
       buffering.style.display = 'none';
     });
+
+    // Hide splash after player is ready or after 1.5s (fallback)
+    function hideSplash() {
+      splashScreen.classList.add('hide');
+    }
+    player.once('ready', hideSplash);
+    setTimeout(hideSplash, 1500); // fallback in case 'ready' is slow
 
     // Auto-play based on URL param
     const params = new URLSearchParams(window.location.search);
